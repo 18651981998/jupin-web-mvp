@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>聚品服饰 · 样版管理系统（网页版 MVP）</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="wrap">
+    <header class="top">
+      <div>
+        <h1><span class="brand-dot"></span>聚品服饰 · 样版管理系统</h1>
+        <div class="subtitle">样版全生命周期管理 · 网页版原型（对应原 VBA 系统 UserForm9）</div>
+      </div>
+      <span class="badge-mvp">MVP 原型 · 模拟数据</span>
+    </header>
+
+    <!-- 筛选区 -->
+    <section class="panel">
+      <div class="filters">
+        <div class="field">
+          <label>客户</label>
+          <select id="f-customer"><option value="">全部客户</option></select>
+        </div>
+        <div class="field">
+          <label>摄影师</label>
+          <select id="f-photographer"><option value="">全部摄影师</option></select>
+        </div>
+        <div class="field">
+          <label>状态</label>
+          <select id="f-status"><option value="">全部状态</option></select>
+        </div>
+        <div class="field">
+          <label>入库日期起</label>
+          <input type="date" id="f-dateFrom" />
+        </div>
+        <div class="field">
+          <label>入库日期止</label>
+          <input type="date" id="f-dateTo" />
+        </div>
+        <button class="btn" id="btn-reset">重置</button>
+      </div>
+    </section>
+
+    <!-- 汇总卡片 -->
+    <section class="summary">
+      <div class="stat"><div class="k">入库量</div><div class="v" id="stat-inbound">0</div></div>
+      <div class="stat"><div class="k">退版量</div><div class="v" id="stat-return">0</div></div>
+      <div class="stat"><div class="k">拍摄费合计</div><div class="v money" id="stat-shoot">¥0.00</div></div>
+      <div class="stat"><div class="k">结账额合计</div><div class="v money" id="stat-settle">¥0.00</div></div>
+      <div class="stat"><div class="k">累计欠款</div><div class="v warn" id="stat-debt">¥0.00</div></div>
+    </section>
+
+    <!-- 工具栏 -->
+    <div class="toolbar">
+      <div class="count" id="count"></div>
+      <button class="btn primary" id="btn-export">导出 CSV</button>
+    </div>
+
+    <!-- 列表 -->
+    <div class="table-scroll">
+      <table>
+        <thead><tr id="head-row"></tr></thead>
+        <tbody id="tbody"></tbody>
+      </table>
+    </div>
+
+    <p style="color:#9aa7b8;font-size:12px;margin-top:14px;text-align:center;">
+      数据说明：本页面为原型演示，使用本地生成的模拟数据。生产环境将替换为 Supabase / Postgres 真实接口。
+    </p>
+  </div>
+
+  <script src="data.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
