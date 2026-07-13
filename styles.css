@@ -155,7 +155,92 @@ body {
 .plan-note { font-size: 13px; color: var(--text-soft); background: #f7f9fc; padding: 12px 14px; border-radius: 8px; margin-top: 8px; }
 .empty-page { text-align: center; color: var(--text-soft); padding: 80px 0; font-size: 15px; }
 
-/* ============ 复用：摄影部查询组件 ============ */
+/* ============ 功能页头部（模块页） ============ */
+.fph-top { display: flex; align-items: center; gap: 10px; }
+.fph-top h1 { font-size: 22px; margin: 0; }
+.func-desc-line { color: var(--text-soft); font-size: 13px; line-height: 1.6; margin: 8px 0 0; max-width: 860px; }
+.tag-proto { font-size: 10px; color: #0c8599; background: #e3fafc; border: 1px solid #99e9f2; padding: 1px 8px; border-radius: 999px; font-weight: 600; }
+.dot-proto { color: #22b8cf; font-size: 8px; margin-left: 6px; }
+
+/* ============ 通用模块页 ============ */
+.mod-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 16px; }
+.mod-stats .ov-card { padding: 14px 16px; }
+.mod-stats .ov-v { font-size: 22px; }
+
+.mod-panel { padding: 0; overflow: hidden; }
+.mod-filters { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; padding: 16px 18px; border-bottom: 1px solid var(--border); background: #fcfdff; }
+.mod-filters .field { display: flex; flex-direction: column; gap: 4px; }
+.mod-filters .field > label { font-size: 12px; color: var(--text-soft); font-weight: 600; }
+.mod-filters .field input, .mod-filters .field select {
+  height: 36px; padding: 0 10px; border: 1px solid var(--border); border-radius: 8px;
+  background: #fff; color: var(--text); font-size: 14px; min-width: 150px; outline: none; transition: border-color .15s;
+}
+.mod-filters .field input:focus, .mod-filters .field select:focus { border-color: var(--primary); }
+.mod-filters .mod-search { min-width: 220px; }
+.mod-filters .date-range { display: flex; align-items: center; gap: 6px; }
+.mod-filters .date-range span { color: var(--text-soft); font-size: 12px; }
+.mod-filters .date-range input { min-width: 130px; }
+.mod-nofilter { color: var(--text-soft); font-size: 13px; padding: 8px 0; }
+
+.mod-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.col-act { width: 1%; white-space: nowrap; }
+td.acts { white-space: nowrap; }
+.link-btn { border: none; background: none; color: var(--primary); cursor: pointer; font-size: 13px; padding: 2px 8px; border-radius: 6px; }
+.link-btn:hover { background: var(--primary-soft); }
+.link-btn + .link-btn { margin-left: 2px; }
+
+/* 进度条 */
+.pbar { position: relative; height: 18px; background: #eef1f6; border-radius: 999px; min-width: 90px; overflow: hidden; }
+.pbar-fill { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 999px; transition: width .3s; }
+.pbar span { position: absolute; left: 0; right: 0; text-align: center; font-size: 11px; line-height: 18px; color: #334; font-variant-numeric: tabular-nums; }
+.pbar.run .pbar-fill { background: linear-gradient(90deg, #4dabf7, #228be6); }
+.pbar.done .pbar-fill { background: linear-gradient(90deg, #51cf66, #2f9e44); }
+.pbar.idle .pbar-fill { background: #ced4da; }
+
+/* 通用徽章配色 */
+.tag.green  { background: #ebfbee; color: #2f9e44; border-color: #c3f0ca; }
+.tag.blue   { background: #e7f5ff; color: #1c7ed6; border-color: #c5e3ff; }
+.tag.cyan   { background: #e3fafc; color: #0c8599; border-color: #99e9f2; }
+.tag.amber  { background: #fff9db; color: #b08900; border-color: #ffe8a3; }
+.tag.red    { background: #fff5f5; color: #e03131; border-color: #ffc9c9; }
+.tag.gray   { background: #f1f3f5; color: #66768a; border-color: #e3e8ef; }
+.tag.purple { background: #f3f0ff; color: #6741d9; border-color: #d0bfff; }
+.tag.orange { background: #fff4e6; color: #d9480f; border-color: #ffd8a8; }
+
+/* 分页器 */
+.pager { display: flex; align-items: center; gap: 6px; padding: 14px 18px; flex-wrap: wrap; border-top: 1px solid var(--border); }
+.pg { height: 32px; min-width: 34px; padding: 0 10px; border: 1px solid var(--border); background: #fff; color: var(--text); border-radius: 8px; cursor: pointer; font-size: 13px; transition: all .15s; }
+.pg:hover:not(:disabled) { border-color: var(--primary); color: var(--primary); }
+.pg.cur { background: var(--primary); border-color: var(--primary); color: #fff; font-weight: 600; }
+.pg:disabled { opacity: .45; cursor: not-allowed; }
+.pg-ell { color: var(--text-soft); padding: 0 4px; }
+.pg-info { margin-left: auto; color: var(--text-soft); font-size: 13px; }
+
+/* 详情弹窗 */
+.mod-modal { position: fixed; inset: 0; z-index: 100; display: none; }
+.mod-modal.open { display: block; }
+.mod-modal-mask { position: absolute; inset: 0; background: rgba(15, 27, 45, .42); }
+.mod-modal-card { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 460px; max-width: 92vw; max-height: 84vh; overflow: auto; background: #fff; border-radius: 14px; box-shadow: 0 20px 60px rgba(16,24,40,.28); }
+.mm-head { display: flex; align-items: center; justify-content: space-between; padding: 16px 20px; border-bottom: 1px solid var(--border); font-weight: 700; font-size: 15px; position: sticky; top: 0; background: #fff; }
+.mm-head #mm-close { border: none; background: #f1f3f5; width: 28px; height: 28px; border-radius: 8px; cursor: pointer; color: var(--text-soft); font-size: 14px; }
+.mm-head #mm-close:hover { background: #e3e8ef; }
+.mm-body { padding: 8px 20px 20px; }
+.dt-row { display: flex; padding: 11px 0; border-bottom: 1px solid #f0f2f5; gap: 12px; }
+.dt-row:last-child { border-bottom: none; }
+.dt-k { width: 110px; flex-shrink: 0; color: var(--text-soft); font-size: 13px; }
+.dt-v { flex: 1; font-size: 14px; text-align: right; word-break: break-all; }
+
+/* Toast */
+.mod-toast { position: fixed; bottom: 28px; left: 50%; transform: translateX(-50%) translateY(20px); background: #1f2933; color: #fff; padding: 10px 18px; border-radius: 10px; font-size: 13px; opacity: 0; pointer-events: none; transition: all .25s; z-index: 200; box-shadow: 0 8px 24px rgba(0,0,0,.2); }
+.mod-toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+/* 响应式：模块 KPI */
+@media (max-width: 1080px) {
+  .mod-stats { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 720px) {
+  .mod-stats { grid-template-columns: 1fr; }
+}
 .filters { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; }
 .field { display: flex; flex-direction: column; gap: 4px; }
 .field label { font-size: 12px; color: var(--text-soft); font-weight: 600; }
