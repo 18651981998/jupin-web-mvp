@@ -211,36 +211,47 @@
   const ACT = { type: 'action', actions: ['查看', '导出'] };
 
   // ============================================================
-  //  采购部（采购明细 / 采购录入 / 供应商管理）
+  //  采购部（采购入库 / 采购明细 / 供应商管理）
+  //  依据知识库 VBA（Sheet8「提交入库 / 供应商录入 / 供应商余额」引擎）还原业务语义
   // ============================================================
   const SUP = ['锦绣纺织品', '华艺服装', '星光道具', '恒达包装', '锐影器材', '云裳面料', '金石五金', '博雅文化', '天工制衣', '佳美辅料'];
+  const SUP_CONTACT = ['张经理', '李总', '王采供', '刘主管', '陈经理', '杨采购', '赵经理', '孙主管', '周经理', '吴总'];
   const PITEMS = ['拍摄道具-复古椅', '样衣-真丝衬衫', '背景布-纯色', '包装盒-礼盒', '灯架-碳纤维', '服装-羊毛大衣', '首饰-项链', '鞋履-高跟', '面料-棉麻', '彩妆套盒', '假发-短卷', '耳环-珍珠'];
   const PCATS = ['服装', '道具', '包装', '器材', '面料', '辅料'];
 
-  const pcDetail = rows(42, 401, (i, r) => {
+  // 供应商主数据（对应 VBA：供应商录入 + 供应商余额引擎）
+  const pcSupplier = rows(24, 403, (i, r) => {
+    const total = money(ri(r, 40000, 900000));
+    const balance = money(Math.round(total * (0.05 + r() * 0.35))); // 应付供应商余额（返款未结）
+    const suffix = i >= SUP.length ? '（' + (Math.floor(i / SUP.length) + 1) + '）' : '';
+    return {
+      id: 'GYS' + (2026000 + i), name: SUP[i % SUP.length] + suffix,
+      contact: SUP_CONTACT[i % SUP_CONTACT.length], phone: '1' + ri(r, 3000000000, 3999999999),
+      category: pick(r, PCATS), rating: pick(r, ['A', 'B', 'C']),
+      totalPurchase: total, balance, status: pick(r, ['合作中', '潜在', '暂停'])
+    };
+  });
+
+  // 采购入库（对应 VBA：提交入库 CommandButton1 → 写入入库记录并刷新供应商余额）
+  const pcStockin = rows(46, 401, (i, r) => {
+    const qty = ri(r, 5, 300), price = money(ri(r, 8, 600));
+    return {
+      id: 'RK' + (2026000 + i), supplier: pick(r, SUP), item: pick(r, PITEMS), category: pick(r, PCATS),
+      qty, price, amount: money(qty * price), inDate: ago(r, 120), handler: pick(r, NAMES),
+      status: pick(r, ['已入库', '待入库', '已退回'])
+    };
+  });
+
+  // 采购明细台账（采购单 / 到货明细）
+  const pcDetail = rows(44, 402, (i, r) => {
     const qty = ri(r, 5, 200), price = money(ri(r, 8, 600));
     const arrive = pick(r, ['已到货', '部分到货', '未到货', '已取消']);
     return {
       id: 'CG' + (2026000 + i), supplier: pick(r, SUP), item: pick(r, PITEMS), category: pick(r, PCATS),
       qty, price, amount: money(qty * price), orderDate: ago(r, 150),
-      arriveDate: (arrive === '未到货' || arrive === '已取消') ? '—' : fut(r, 30),
-      status: arrive
+      arriveDate: (arrive === '未到货' || arrive === '已取消') ? '—' : fut(r, 30), status: arrive
     };
   });
-  const pcInput = rows(34, 402, (i, r) => {
-    const qty = ri(r, 5, 150), est = money(qty * ri(r, 8, 500));
-    return {
-      id: 'LR' + (2026000 + i), supplier: pick(r, SUP), item: pick(r, PITEMS), category: pick(r, PCATS),
-      qty, estAmount: est, applicant: pick(r, NAMES), inputDate: ago(r, 60),
-      status: pick(r, ['待审核', '已通过', '已驳回', '已下单'])
-    };
-  });
-  const pcSupplier = rows(28, 403, (i, r) => ({
-    id: 'GYS' + (2026000 + i), name: SUP[i % SUP.length], contact: pick(r, NAMES),
-    phone: '1' + ri(r, 3000000000, 3999999999), category: pick(r, PCATS),
-    rating: pick(r, ['A', 'B', 'C']), status: pick(r, ['合作中', '潜在', '暂停']),
-    totalPurchase: money(ri(r, 20000, 600000))
-  }));
 
   window.JP_MODULES = {
     // ---------- 摄影部 ----------
@@ -601,40 +612,79 @@
     },
 
     // ---------- 采购部 ----------
-    'pc-detail': {
-      title: '采购明细', desc: '查看采购订单明细，跟踪物料到货状态与金额，支持按供应商、商品、到货状态筛选与导出。',
-      filters: [{ type: 'search', key: 'kw', placeholder: '搜索采购单 / 供应商 / 商品' }, { type: 'select', field: 'status', label: '到货状态', options: ['全部', '已到货', '部分到货', '未到货', '已取消'] }],
+    'pc-stockin': {
+      title: '采购入库', desc: '登记并确认采购物料入库（对应 VBA「提交入库」），记录供应商、数量、单价与金额，并联动供应商应付余额。',
+      api: '/api/pc/stockin',
+      filters: [
+        { type: 'search', key: 'kw', placeholder: '搜索入库单 / 供应商 / 物料' },
+        { type: 'select', field: 'category', label: '物料类别', options: ['全部'].concat(PCATS) },
+        { type: 'select', field: 'status', label: '入库状态', options: ['全部', '已入库', '待入库', '已退回'] }
+      ],
       columns: [
-        { key: 'id', label: '采购单号' }, { key: 'supplier', label: '供应商' }, { key: 'item', label: '商品' }, { key: 'category', label: '类别' },
-        { key: 'qty', label: '数量', type: 'num' }, { key: 'price', label: '单价', type: 'money' }, { key: 'amount', label: '金额', type: 'money' },
+        { key: 'id', label: '入库单号' }, { key: 'supplier', label: '供应商' }, { key: 'item', label: '物料' },
+        { key: 'category', label: '类别' }, { key: 'qty', label: '数量', type: 'num' },
+        { key: 'price', label: '单价', type: 'money' }, { key: 'amount', label: '金额', type: 'money' },
+        { key: 'inDate', label: '入库日期' }, { key: 'handler', label: '经手人' },
+        Object.assign({ key: 'status', label: '状态' }, badge({ '已入库': G, '待入库': A, '已退回': R })), ACT
+      ],
+      stats: (d) => [
+        { k: '入库单数', v: d.length },
+        { k: '已入库', v: d.filter(r => r.status === '已入库').length },
+        { k: '待入库', v: d.filter(r => r.status === '待入库').length },
+        { k: '入库总金额', v: fmtMoney(sum(d.filter(r => r.status !== '已退回'), 'amount')) }
+      ],
+      data: () => pcStockin
+    },
+    'pc-detail': {
+      title: '采购明细', desc: '采购订单与到货明细台账，跟踪物料到货状态、金额与账期，支持按供应商、类别、到货状态筛选与导出。',
+      api: '/api/pc/detail',
+      filters: [
+        { type: 'search', key: 'kw', placeholder: '搜索采购单 / 供应商 / 物料' },
+        { type: 'select', field: 'category', label: '类别', options: ['全部'].concat(PCATS) },
+        { type: 'select', field: 'status', label: '到货状态', options: ['全部', '已到货', '部分到货', '未到货', '已取消'] }
+      ],
+      columns: [
+        { key: 'id', label: '采购单号' }, { key: 'supplier', label: '供应商' }, { key: 'item', label: '物料' },
+        { key: 'category', label: '类别' }, { key: 'qty', label: '数量', type: 'num' },
+        { key: 'price', label: '单价', type: 'money' }, { key: 'amount', label: '金额', type: 'money' },
         { key: 'orderDate', label: '下单日期' }, { key: 'arriveDate', label: '到货日期' },
         Object.assign({ key: 'status', label: '状态' }, badge({ '已到货': G, '部分到货': A, '未到货': B, '已取消': Y })), ACT
       ],
-      stats: (d) => [{ k: '采购单数', v: d.length }, { k: '已到货', v: d.filter(r => r.status === '已到货').length }, { k: '未到货', v: d.filter(r => r.status === '未到货').length }, { k: '采购总额', v: fmtMoney(sum(d, 'amount')) }],
+      stats: (d) => [
+        { k: '采购单数', v: d.length },
+        { k: '已到货', v: d.filter(r => r.status === '已到货').length },
+        { k: '未到货', v: d.filter(r => r.status === '未到货').length },
+        { k: '采购总额', v: fmtMoney(sum(d, 'amount')) }
+      ],
       data: () => pcDetail
     },
-    'pc-input': {
-      title: '采购录入', desc: '录入新采购需求，关联供应商与商品，提交审核后生成采购单并推送仓库。',
-      filters: [{ type: 'search', key: 'kw', placeholder: '搜索录入单 / 供应商 / 商品' }, { type: 'select', field: 'status', label: '审核状态', options: ['全部', '待审核', '已通过', '已驳回', '已下单'] }],
-      columns: [
-        { key: 'id', label: '录入单号' }, { key: 'supplier', label: '供应商' }, { key: 'item', label: '商品' }, { key: 'category', label: '类别' },
-        { key: 'qty', label: '数量', type: 'num' }, { key: 'estAmount', label: '预估金额', type: 'money' }, { key: 'applicant', label: '申请人' },
-        { key: 'inputDate', label: '录入日期' }, Object.assign({ key: 'status', label: '状态' }, badge({ '待审核': A, '已通过': B, '已驳回': R, '已下单': G })), ACT
-      ],
-      stats: (d) => [{ k: '录入单数', v: d.length }, { k: '待审核', v: d.filter(r => r.status === '待审核').length }, { k: '已通过', v: d.filter(r => r.status === '已通过').length }, { k: '已下单', v: d.filter(r => r.status === '已下单').length }, { k: '预估总额', v: fmtMoney(sum(d, 'estAmount')) }],
-      data: () => pcInput
-    },
     'pc-supplier': {
-      title: '供应商管理', desc: '维护供应商档案、联系人、合作类别与评级，支撑采购寻源、比价与对账。',
-      filters: [{ type: 'search', key: 'kw', placeholder: '搜索供应商编号 / 名称 / 联系人' }, { type: 'select', field: 'status', label: '合作状态', options: ['全部', '合作中', '潜在', '暂停'] }],
+      title: '供应商管理', desc: '维护供应商档案、联系人、合作类别与评级，并展示累计采购与应付余额（对应 VBA「供应商录入 / 供应商余额」）。',
+      api: '/api/pc/suppliers',
+      filters: [
+        { type: 'search', key: 'kw', placeholder: '搜索供应商编号 / 名称 / 联系人' },
+        { type: 'select', field: 'category', label: '类别', options: ['全部'].concat(PCATS) },
+        { type: 'select', field: 'rating', label: '评级', options: ['全部', 'A', 'B', 'C'] },
+        { type: 'select', field: 'status', label: '合作状态', options: ['全部', '合作中', '潜在', '暂停'] }
+      ],
       columns: [
-        { key: 'id', label: '供应商编号' }, { key: 'name', label: '供应商名称' }, { key: 'contact', label: '联系人' }, { key: 'phone', label: '联系电话' },
+        { key: 'id', label: '供应商编号' }, { key: 'name', label: '供应商名称' }, { key: 'contact', label: '联系人' },
+        { key: 'phone', label: '联系电话' },
         Object.assign({ key: 'category', label: '类别' }, badge({ '服装': B, '道具': C, '包装': O, '器材': P, '面料': A, '辅料': Y })),
-        Object.assign({ key: 'rating', label: '评级' }, badge({ 'A': G, 'B': A, 'C': Y })), { key: 'totalPurchase', label: '累计采购', type: 'money' },
+        Object.assign({ key: 'rating', label: '评级' }, badge({ 'A': G, 'B': A, 'C': Y })),
+        { key: 'totalPurchase', label: '累计采购', type: 'money' }, { key: 'balance', label: '应付余额', type: 'money' },
         Object.assign({ key: 'status', label: '合作' }, badge({ '合作中': G, '潜在': A, '暂停': R })), ACT
       ],
-      stats: (d) => [{ k: '供应商数', v: d.length }, { k: '合作中', v: d.filter(r => r.status === '合作中').length }, { k: '潜在', v: d.filter(r => r.status === '潜在').length }, { k: '累计采购额', v: fmtMoney(sum(d, 'totalPurchase')) }],
+      stats: (d) => [
+        { k: '供应商数', v: d.length },
+        { k: '合作中', v: d.filter(r => r.status === '合作中').length },
+        { k: 'A级', v: d.filter(r => r.rating === 'A').length },
+        { k: '应付余额合计', v: fmtMoney(sum(d, 'balance')) }
+      ],
       data: () => pcSupplier
     }
   };
+
+  // 供后端桥接 / 数据导出使用（不影响前端渲染）
+  window.JP_DATA = { pcStockin, pcDetail, pcSupplier };
 })();
