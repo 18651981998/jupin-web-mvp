@@ -212,17 +212,21 @@
 
   // ============================================================
   //  采购部（采购入库 / 采购明细 / 供应商管理）
-  //  依据知识库 VBA（Sheet8「提交入库 / 供应商录入 / 供应商余额」引擎）还原业务语义
+  //  严格对照 VBA 截图真实表头还原：
+  //    采购入库 = 录单+查询（筛选：供应商/起始日期/批次号/截止日期）
+  //               表格列：日期 / 供应商(下拉) / 批次号 / 拿货件数 / 退货件数 /
+  //                      金额(可正可负，负数红字) / 已结货款 / 助记符 / 备注
+  //               统计：累计欠款 / 累计补货 / 累计递损
+  //    采购明细 = 明细台账（同上 + 累计欠款列），底部操作：保存/清空/新增供应商
   // ============================================================
-  const SUP = ['锦绣纺织品', '华艺服装', '星光道具', '恒达包装', '锐影器材', '云裳面料', '金石五金', '博雅文化', '天工制衣', '佳美辅料'];
-  const SUP_CONTACT = ['张经理', '李总', '王采供', '刘主管', '陈经理', '杨采购', '赵经理', '孙主管', '周经理', '吴总'];
-  const PITEMS = ['拍摄道具-复古椅', '样衣-真丝衬衫', '背景布-纯色', '包装盒-礼盒', '灯架-碳纤维', '服装-羊毛大衣', '首饰-项链', '鞋履-高跟', '面料-棉麻', '彩妆套盒', '假发-短卷', '耳环-珍珠'];
+  const SUP = ['鸿耀', '锦绣纺织品', '华艺服装', '星光道具', '恒达包装', '锐影器材', '云裳面料'];
+  const SUP_CONTACT = ['张经理', '李总', '王采供', '刘主管', '陈经理', '杨采购', '赵经理'];
   const PCATS = ['服装', '道具', '包装', '器材', '面料', '辅料'];
 
   // 供应商主数据（对应 VBA：供应商录入 + 供应商余额引擎）
   const pcSupplier = rows(24, 403, (i, r) => {
     const total = money(ri(r, 40000, 900000));
-    const balance = money(Math.round(total * (0.05 + r() * 0.35))); // 应付供应商余额（返款未结）
+    const balance = money(Math.round(total * (0.05 + r() * 0.35)));
     const suffix = i >= SUP.length ? '（' + (Math.floor(i / SUP.length) + 1) + '）' : '';
     return {
       id: 'GYS' + (2026000 + i), name: SUP[i % SUP.length] + suffix,
@@ -232,25 +236,57 @@
     };
   });
 
-  // 采购入库（对应 VBA：提交入库 CommandButton1 → 写入入库记录并刷新供应商余额）
-  const pcStockin = rows(46, 401, (i, r) => {
-    const qty = ri(r, 5, 300), price = money(ri(r, 8, 600));
-    return {
-      id: 'RK' + (2026000 + i), supplier: pick(r, SUP), item: pick(r, PITEMS), category: pick(r, PCATS),
-      qty, price, amount: money(qty * price), inDate: ago(r, 120), handler: pick(r, NAMES),
-      status: pick(r, ['已入库', '待入库', '已退回'])
-    };
+  // 采购入库记录 —— 对应 VBA「提交入库」页表格（截图1）
+  // 字段完全对齐截图：日期 | 供应商 | 批次号 | 拿货件数 | 退货件数 | 金额(±) | 已结货款 | 助记符 | 备注
+  // 数据特征：批次号5位(25xxx)，日期集中在6月，金额有正有负（退货为负红字），助记符"退"
+  const AMT_POS = [58, 158, 372, 68, 65, 232, 212, 89, 145, 310, 420, 180];
+  const AMT_NEG = [90, 189, 58, 49, 120, 75, 200, 35, 160, 95]; // 正数，代码中加负号变红字
+  const BATCHES = [25113, 25234, 25427, 25615, 25614, 25692, 25822, 26028, 26082, 26224,
+                   26320, 26283, 26428, 26480, 26533, 26590, 26612, 26701, 26755, 26800];
+
+  const pcStockin = rows(46, 411, (i, r) => {
+    const isReturn = r() < 0.28; // ~28% 是退货记录
+    const dayOff = ri(r, 0, 38);
+    const dateStr = new Date(Date.UTC(2026, 5, 12) + dayOff * 86400000);
+    const y = dateStr.getFullYear(), m = String(dateStr.getMonth() + 1).padStart(2,'0'), d = String(dateStr.getDate()).padStart(2,'0');
+    const date = `${y}/${m}/${d}`;
+    const supplier = pick(r, SUP);
+    const batchNo = BATCHES[i % BATCHES.length] + Math.floor(i / BATCHES.length) * 100;
+    const pickQty = isReturn ? 0 : ri(r, 1, 8);
+    const returnQty = isReturn ? ri(r, 1, 6) : (r() < 0.15 ? ri(r, 1, 3) : 0);
+    let amount;
+    if (isReturn) {
+      // 退货：金额必为负数（VBA 截图红字：¥-90 ¥-189 ¥-58）
+      amount = money(-AMT_NEG[i % AMT_NEG.length] * (0.7 + r() * 0.6));
+    } else {
+      // 正常拿货：正数
+      amount = money(AMT_POS[i % AMT_POS.length] * (0.7 + r() * 0.6));
+    }
+    const settled = r() < 0.45 ? money(Math.abs(amount)) : '';
+    // 助记符与退货状态联动
+    const memo = isReturn ? '退' : pick(r, ['', '', '', '', '补']);
+    return { date, supplier, batchNo, pickQty, returnQty, amount, settled, memo, remark: '' };
   });
 
-  // 采购明细台账（采购单 / 到货明细）
+  // 采购明细台账 —— 对应 VBA「首页2」（截图2），比入库多一列「累计欠款」
   const pcDetail = rows(44, 402, (i, r) => {
-    const qty = ri(r, 5, 200), price = money(ri(r, 8, 600));
-    const arrive = pick(r, ['已到货', '部分到货', '未到货', '已取消']);
-    return {
-      id: 'CG' + (2026000 + i), supplier: pick(r, SUP), item: pick(r, PITEMS), category: pick(r, PCATS),
-      qty, price, amount: money(qty * price), orderDate: ago(r, 150),
-      arriveDate: (arrive === '未到货' || arrive === '已取消') ? '—' : fut(r, 30), status: arrive
-    };
+    const isReturn = r() < 0.25;
+    const dayOff = ri(r, 0, 42);
+    const dateStr = new Date(Date.UTC(2026, 5, 10) + dayOff * 86400000);
+    const y = dateStr.getFullYear(), m = String(dateStr.getMonth() + 1).padStart(2,'0'), d = String(dateStr.getDate()).padStart(2,'0');
+    const date = `${y}/${m}/${d}`;
+    const supplier = pick(r, SUP);
+    const batchNo = 25000 + i + ri(r, 0, 500);
+    const pickQty = isReturn ? 0 : ri(r, 1, 10);
+    const returnQty = isReturn ? ri(r, 1, 5) : (r() < 0.12 ? ri(r, 1, 3) : 0);
+    const baseAmt = ri(r, 20, 600);
+    // 退货记录金额为负（红字），与助记符联动
+    const amount = isReturn ? money(-baseAmt * (0.7 + r() * 0.5)) : money(baseAmt * (0.6 + r() * 0.8));
+    const settled = r() < 0.4 ? '' : money(Math.abs(amount) * r());
+    const debtRun = ri(r, 100, 8000); // 该行累计欠款（滚动累加模拟值）
+    const memo = isReturn ? '退' : pick(r, ['', '', '补', '', '']);
+    return { date, supplier, batchNo, pickQty, returnQty, amount, settled, memo,
+             debt: money(debtRun), remark: '' };
   });
 
   window.JP_MODULES = {
@@ -611,50 +647,67 @@
       data: () => opAnalysis
     },
 
-    // ---------- 采购部 ----------
+    // ---------- 采购部（对照 VBA 截图真实字段） ----------
     'pc-stockin': {
-      title: '采购入库', desc: '登记并确认采购物料入库（对应 VBA「提交入库」），记录供应商、数量、单价与金额，并联动供应商应付余额。',
+      title: '采购入库', desc: 'VBA「提交入库」录单与查询页：按供应商/日期/批次号筛选拿货退货记录，统计累计欠款、补货、递损。金额负数=退货（红字显示）。',
       api: '/api/pc/stockin',
       filters: [
-        { type: 'search', key: 'kw', placeholder: '搜索入库单 / 供应商 / 物料' },
-        { type: 'select', field: 'category', label: '物料类别', options: ['全部'].concat(PCATS) },
-        { type: 'select', field: 'status', label: '入库状态', options: ['全部', '已入库', '待入库', '已退回'] }
+        { type: 'search', key: 'supplier', placeholder: '筛选供应商（如：鸿耀）' },
+        { type: 'select', field: 'dateFrom', label: '起始日期', options: ['全部'] },
+        { type: 'search', key: 'batchNo', placeholder: '批次号（如 25113）' },
+        { type: 'select', field: 'dateTo', label: '截止日期', options: ['全部'] }
       ],
       columns: [
-        { key: 'id', label: '入库单号' }, { key: 'supplier', label: '供应商' }, { key: 'item', label: '物料' },
-        { key: 'category', label: '类别' }, { key: 'qty', label: '数量', type: 'num' },
-        { key: 'price', label: '单价', type: 'money' }, { key: 'amount', label: '金额', type: 'money' },
-        { key: 'inDate', label: '入库日期' }, { key: 'handler', label: '经手人' },
-        Object.assign({ key: 'status', label: '状态' }, badge({ '已入库': G, '待入库': A, '已退回': R })), ACT
+        { key: 'date', label: '日期' },
+        Object.assign({ key: 'supplier', label: '供应商' }, badge({ '鸿耀': G, '锦绣纺织品': B, '华艺服装': C, '星光道具': A, '恒达包装': O, '锐影器材': P, '云裳面料': Y })),
+        { key: 'batchNo', label: '批次号' },
+        { key: 'pickQty', label: '拿货件数', type: 'num' },
+        { key: 'returnQty', label: '退货件数', type: 'num' },
+        { key: 'amount', label: '金额', type: 'money' }, // 负数自动红字
+        { key: 'settled', label: '已结货款', type: 'money' },
+        Object.assign({ key: 'memo', label: '助记符' }, badge({ '退': R, '补': A, '结': B })),
+        { key: 'remark', label: '备注' },
+        ACT
       ],
-      stats: (d) => [
-        { k: '入库单数', v: d.length },
-        { k: '已入库', v: d.filter(r => r.status === '已入库').length },
-        { k: '待入库', v: d.filter(r => r.status === '待入库').length },
-        { k: '入库总金额', v: fmtMoney(sum(d.filter(r => r.status !== '已退回'), 'amount')) }
-      ],
+      stats: (d) => {
+        const debt = d.reduce((s, r) => s + (Number(r.amount) < 0 ? Math.abs(Number(r.amount)) : 0), 0);
+        const restock = d.filter(r => Number(r.amount) > 0).length;
+        const loss = d.filter(r => r.memo === '退').reduce((s, r) => s + Math.abs(Number(r.amount)), 0);
+        return [
+          { k: '累计欠款', v: fmtMoney(debt) },
+          { k: '累计补货', v: restock + ' 笔' },
+          { k: '累计递损', v: fmtMoney(loss) },
+          { k: '总记录', v: d.length }
+        ];
+      },
       data: () => pcStockin
     },
     'pc-detail': {
-      title: '采购明细', desc: '采购订单与到货明细台账，跟踪物料到货状态、金额与账期，支持按供应商、类别、到货状态筛选与导出。',
+      title: '采购明细', desc: 'VBA「首页2」采购明细台账：完整交易记录，含每行累计欠款滚动值。底部支持保存/清空/新增供应商操作。',
       api: '/api/pc/detail',
       filters: [
-        { type: 'search', key: 'kw', placeholder: '搜索采购单 / 供应商 / 物料' },
-        { type: 'select', field: 'category', label: '类别', options: ['全部'].concat(PCATS) },
-        { type: 'select', field: 'status', label: '到货状态', options: ['全部', '已到货', '部分到货', '未到货', '已取消'] }
+        { type: 'search', key: 'kw', placeholder: '搜索供应商 / 批次号 / 助记符' },
+        { type: 'select', field: 'dateFrom', label: '起始日期', options: ['全部'] },
+        { type: 'select', field: 'dateTo', label: '截止日期', options: ['全部'] }
       ],
       columns: [
-        { key: 'id', label: '采购单号' }, { key: 'supplier', label: '供应商' }, { key: 'item', label: '物料' },
-        { key: 'category', label: '类别' }, { key: 'qty', label: '数量', type: 'num' },
-        { key: 'price', label: '单价', type: 'money' }, { key: 'amount', label: '金额', type: 'money' },
-        { key: 'orderDate', label: '下单日期' }, { key: 'arriveDate', label: '到货日期' },
-        Object.assign({ key: 'status', label: '状态' }, badge({ '已到货': G, '部分到货': A, '未到货': B, '已取消': Y })), ACT
+        { key: 'date', label: '日期' },
+        Object.assign({ key: 'supplier', label: '供应商' }, badge({ '鸿耀': G, '锦绣纺织品': B, '华艺服装': C, '星光道具': A, '恒达包装': O, '锐影器材': P, '云裳面料': Y })),
+        { key: 'batchNo', label: '批次号' },
+        { key: 'pickQty', label: '拿货件数', type: 'num' },
+        { key: 'returnQty', label: '退货件数', type: 'num' },
+        { key: 'amount', label: '金额', type: 'money' },
+        { key: 'settled', label: '已结货款', type: 'money' },
+        Object.assign({ key: 'memo', label: '助记符' }, badge({ '退': R, '补': A, '结': B })),
+        { key: 'debt', label: '累计欠款', type: 'money' },
+        { key: 'remark', label: '备注' },
+        ACT
       ],
       stats: (d) => [
-        { k: '采购单数', v: d.length },
-        { k: '已到货', v: d.filter(r => r.status === '已到货').length },
-        { k: '未到货', v: d.filter(r => r.status === '未到货').length },
-        { k: '采购总额', v: fmtMoney(sum(d, 'amount')) }
+        { k: '总记录', v: d.length },
+        { k: '拿货总件', v: fmtInt(d.reduce((s, r) => s + (r.pickQty || 0), 0)) },
+        { k: '退货总件', v: fmtInt(d.reduce((s, r) => s + (r.returnQty || 0), 0)) },
+        { k: '当前总欠款', v: fmtMoney(d.reduce((s, r) => s + (Number(r.debt) || 0), 0)) }
       ],
       data: () => pcDetail
     },
