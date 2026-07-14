@@ -1,0 +1,17 @@
+{
+  "name": "jupin-pc-bridge",
+  "version": "1.0.0",
+  "description": "聚品服饰 · 采购部后端桥接服务：将本地 Access 数据库(数据存储.accdb)通过 REST API 暴露给网页端",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "gen": "node gen.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "cors": "^2.8.5"
+  },
+  "optionalDependencies": {
+    "node-adodb": "^3.2.0"
+  }
+}
