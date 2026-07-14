@@ -649,13 +649,20 @@
 
     // ---------- 采购部（对照 VBA 截图真实字段） ----------
     'pc-stockin': {
-      title: '采购入库', desc: 'VBA「提交入库」录单与查询页：按供应商/日期/批次号筛选拿货退货记录，统计累计欠款、补货、递损。金额负数=退货（红字显示）。',
-      api: '/api/pc/stockin',
+      title: '采购入库', kind: 'stockin',
+      desc: '对照 VBA「Sheet8·提交入库」：按供应商/起始日期/批次号/截止日期筛选拿货与退货记录。金额负数=退货（红字）。顶部统计：累计欠款=Σ金额−Σ已结货款；累计补货=Σ补货金额；累计递损=Σ退货金额。',
       filters: [
-        { type: 'search', key: 'supplier', placeholder: '筛选供应商（如：鸿耀）' },
-        { type: 'select', field: 'dateFrom', label: '起始日期', options: ['全部'] },
+        { type: 'search', key: 'supplier', placeholder: '供应商（如：鸿耀）' },
+        { type: 'date', field: 'dateFrom', label: '起始日期' },
         { type: 'search', key: 'batchNo', placeholder: '批次号（如 25113）' },
-        { type: 'select', field: 'dateTo', label: '截止日期', options: ['全部'] }
+        { type: 'date', field: 'dateTo', label: '截止日期' }
+      ],
+      actions: [
+        { label: '提交入库', act: 'add', primary: true },
+        { label: '供应商录入', act: 'addsup' },
+        { label: '查询', act: 'filter' },
+        { label: '清空', act: 'clear' },
+        { label: '导出CSV', act: 'export' }
       ],
       columns: [
         { key: 'date', label: '日期' },
@@ -670,25 +677,35 @@
         ACT
       ],
       stats: (d) => {
-        const debt = d.reduce((s, r) => s + (Number(r.amount) < 0 ? Math.abs(Number(r.amount)) : 0), 0);
-        const restock = d.filter(r => Number(r.amount) > 0).length;
-        const loss = d.filter(r => r.memo === '退').reduce((s, r) => s + Math.abs(Number(r.amount)), 0);
+        const payable = d.reduce((s, r) => s + (Number(r.amount) || 0), 0);
+        const paid = d.reduce((s, r) => s + (Number(r.settled) || 0), 0);
+        const debt = payable - paid;
+        const restock = d.filter(r => r.memo === '补').reduce((s, r) => s + Math.abs(Number(r.amount) || 0), 0);
+        const loss = d.filter(r => r.memo === '退').reduce((s, r) => s + Math.abs(Number(r.amount) || 0), 0);
         return [
-          { k: '累计欠款', v: fmtMoney(debt) },
-          { k: '累计补货', v: restock + ' 笔' },
+          { k: '累计欠款', v: fmtMoney(debt), red: debt < 0 },
+          { k: '累计补货', v: fmtMoney(restock) },
           { k: '累计递损', v: fmtMoney(loss) },
-          { k: '总记录', v: d.length }
+          { k: '总记录', v: d.length + ' 条' }
         ];
       },
       data: () => pcStockin
     },
     'pc-detail': {
-      title: '采购明细', desc: 'VBA「首页2」采购明细台账：完整交易记录，含每行累计欠款滚动值。底部支持保存/清空/新增供应商操作。',
-      api: '/api/pc/detail',
+      title: '采购明细', kind: 'detail',
+      desc: '对照 VBA「Sheet11·首页2」采购明细台账：完整交易记录，每行「累计欠款」按供应商日期顺序滚动累计（Σ金额−Σ已结货款）。按钮对应 VBA：查询当日退货 / 筛选查询 / 清空 / 导出账单 / 导出汇总 / 供应商汇总。',
       filters: [
-        { type: 'search', key: 'kw', placeholder: '搜索供应商 / 批次号 / 助记符' },
-        { type: 'select', field: 'dateFrom', label: '起始日期', options: ['全部'] },
-        { type: 'select', field: 'dateTo', label: '截止日期', options: ['全部'] }
+        { type: 'search', key: 'kw', placeholder: '供应商 / 批次号 / 助记符' },
+        { type: 'date', field: 'dateFrom', label: '起始日期' },
+        { type: 'date', field: 'dateTo', label: '截止日期' }
+      ],
+      actions: [
+        { label: '查询当日退货', act: 'ret', primary: true },
+        { label: '筛选查询', act: 'filter' },
+        { label: '清空', act: 'clear' },
+        { label: '导出账单', act: 'export' },
+        { label: '导出汇总', act: 'exportsum' },
+        { label: '供应商汇总', act: 'sum' }
       ],
       columns: [
         { key: 'date', label: '日期' },
@@ -703,12 +720,19 @@
         { key: 'remark', label: '备注' },
         ACT
       ],
-      stats: (d) => [
-        { k: '总记录', v: d.length },
-        { k: '拿货总件', v: fmtInt(d.reduce((s, r) => s + (r.pickQty || 0), 0)) },
-        { k: '退货总件', v: fmtInt(d.reduce((s, r) => s + (r.returnQty || 0), 0)) },
-        { k: '当前总欠款', v: fmtMoney(d.reduce((s, r) => s + (Number(r.debt) || 0), 0)) }
-      ],
+      stats: (d) => {
+        const pickQ = d.reduce((s, r) => s + (Number(r.pickQty) || 0), 0);
+        const retQ = d.reduce((s, r) => s + (Number(r.returnQty) || 0), 0);
+        const payable = d.reduce((s, r) => s + (Number(r.amount) || 0), 0);
+        const paid = d.reduce((s, r) => s + (Number(r.settled) || 0), 0);
+        const debt = payable - paid;
+        return [
+          { k: '总记录', v: d.length + ' 条' },
+          { k: '拿货总件', v: fmtInt(pickQ) },
+          { k: '退货总件', v: fmtInt(retQ) },
+          { k: '当前总欠款', v: fmtMoney(debt), red: debt < 0 }
+        ];
+      },
       data: () => pcDetail
     },
     'pc-supplier': {
