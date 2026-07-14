@@ -229,8 +229,17 @@
   }
 
   function mountModule(root, spec) {
-    const all = (typeof spec.data === 'function') ? spec.data() : spec.data;
+    let all = (typeof spec.data === 'function') ? spec.data() : spec.data;
     const state = { kw: '', sel: {}, dateFrom: '', dateTo: '', sortKey: null, sortDir: 'asc', page: 1, pageSize: 12 };
+
+    // DB-ready 钩子：若配置了后端 API（window.JP_API_BASE）且本模块声明了 api 路径，
+    // 则从真实数据库拉取数据并刷新；否则保持内置确定性模拟数据（默认，无需后端）。
+    if (window.JP_API_BASE && spec.api) {
+      fetch(window.JP_API_BASE + spec.api, { credentials: 'omit' })
+        .then((r) => (r.ok ? r.json() : Promise.reject()))
+        .then((j) => { all = (j && Array.isArray(j.data)) ? j.data : (Array.isArray(j) ? j : all); renderHead(); renderRows(); })
+        .catch(() => { /* 后端不可达时静默回退到模拟数据 */ });
+    }
 
     // 骨架
     const statsHtml = spec.stats ? `<section class="mod-stats" id="mod-stats"></section>` : '';
