@@ -31,7 +31,7 @@
 
   // 应用署名与版本（单一真源：每次修改版本号尾数 +1，如 V26.0407 -> V26.0408）
   const APP_AUTHOR = 'A0_0CN涛声依旧';
-  const APP_VERSION = 'V26.0408';
+  const APP_VERSION = 'V26.0409';
 
   // ---------- 侧边栏 ----------
   function renderSidebar() {
@@ -319,7 +319,11 @@
 
     function cellHTML(c, r) {
       const v = r[c.key];
-      if (c.type === 'money') return `<td class="num">${fmtMoney(v)}</td>`;
+      if (c.type === 'money') {
+        const n = Number(v);
+        const neg = !isNaN(n) && n < 0;
+        return `<td class="num"${neg ? ' style="color:#e53935;font-weight:600"' : ''}>${fmtMoney(v)}</td>`;
+      }
       if (c.type === 'num') return `<td class="num">${fmtInt(v)}</td>`;
       if (c.type === 'progress') {
         const cls = v >= 100 ? 'done' : v === 0 ? 'idle' : 'run';
@@ -416,7 +420,11 @@
       const body = spec.columns.filter((c) => c.type !== 'action').map((c) => {
         const v = r[c.key];
         let val = (v === '' || v == null) ? '—' : v;
-        if (c.type === 'money') val = fmtMoney(v);
+        if (c.type === 'money') {
+          const n = Number(v);
+          val = fmtMoney(v);
+          if (!isNaN(n) && n < 0) val = `<span style="color:#e53935;font-weight:600">${val}</span>`;
+        }
         else if (c.type === 'num') val = fmtInt(v);
         else if (c.type === 'progress') val = v + '%';
         else if (c.type === 'badge') val = `<span class="tag ${badgeClass(c, v)}">${v}</span>`;
