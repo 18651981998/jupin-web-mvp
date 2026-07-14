@@ -309,3 +309,13 @@ td.num { text-align: right; font-variant-numeric: tabular-nums; }
   .sidebar { position: fixed; z-index: 50; transform: translateX(-100%); transition: transform .2s; }
   .dept-grid, .func-grid { grid-template-columns: 1fr; }
 }
+
+/* ============ 采购部录入表单（提交入库 / 供应商录入） ============ */
+.form-row { display: flex; flex-direction: column; gap: 5px; margin-bottom: 14px; }
+.form-row label { font-size: 13px; color: var(--text-soft); font-weight: 600; }
+.form-row input, .form-row select {
+  height: 38px; padding: 0 12px; border: 1px solid var(--border); border-radius: 8px;
+  background: #fff; color: var(--text); font-size: 14px; min-width: 260px; outline: none; transition: border-color .15s;
+}
+.form-row input:focus, .form-row select:focus { border-color: var(--primary); }
+.form-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 6px; }
