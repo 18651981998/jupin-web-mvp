@@ -29,6 +29,10 @@
   const fmtMoney = (n) => '¥' + Number(n).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   const fmtInt = (n) => Number(n).toLocaleString('zh-CN');
 
+  // 应用署名与版本（单一真源：每次修改版本号尾数 +1，如 V26.0407 -> V26.0408）
+  const APP_AUTHOR = 'A0_0CN涛声依旧';
+  const APP_VERSION = 'V26.0408';
+
   // ---------- 侧边栏 ----------
   function renderSidebar() {
     let html = `
@@ -578,7 +582,16 @@
     renderHome();
   }
 
+  // 应用署名与版本号渲染（顶部版本标签 + 底部署名栏）
+  function renderMeta() {
+    const v = document.getElementById('ver-tag');
+    if (v) v.textContent = APP_VERSION;
+    const f = document.getElementById('app-footer');
+    if (f) f.innerHTML = '作者：' + APP_AUTHOR + ' &nbsp;·&nbsp; 版本：' + APP_VERSION;
+  }
+
   renderSidebar();
+  renderMeta();
   window.addEventListener('hashchange', router);
   router();
 })();
